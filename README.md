@@ -46,7 +46,7 @@ A fun computer vision application that detects faces in real-time using a webcam
 
 Run the webcam demo:
 ```bash
-python -m src.run_webcam
+python src\run_webcam.py
 ```
 
 ### Controls
