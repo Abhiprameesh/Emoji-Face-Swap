@@ -2,6 +2,8 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyo
+*.pyd
 
 # C extensions
 *.so
@@ -45,6 +47,8 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+.pytest
+.mypy_cache/
 
 # Virtual Environment
 .venv
@@ -57,10 +61,37 @@ ENV/
 .vscode/
 *.swp
 *.swo
+*~
+.project
+.pydevproject
+.settings/
 
 # Project specific
 *.dat
 *.pkl
+*.h5
+*.hdf5
+*.model
+*.weights
+
+# Data files (large and not suitable for version control)
+data/*
+!data/.gitkeep
+!data/README.md
+
+# Model files (large and can be regenerated)
+models/*
+!models/.gitkeep
+!models/README.md
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Logs and databases
+*.log
+*.sql
+*.sqlite
+*.db
 
 # OS generated files
 .DS_Store
@@ -70,3 +101,9 @@ ENV/
 .Trashes
 ehthumbs.db
 Thumbs.db
+*.lnk
+
+# Environment variables
+.env
+.env.*
+!.env.example
