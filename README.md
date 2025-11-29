@@ -2,9 +2,9 @@
 
 A real-time computer vision application that detects faces using your webcam and overlays expressive emojis based on facial expressions. The application uses a combination of OpenCV and dlib (with a fallback to OpenCV's Haar cascades) for face detection and emotion recognition.
 
-## ✨ Features
+##  Features
 
-- **Real-time Face Detection**: Uses dlib (with OpenCV fallback) for robust face detection
+- **Real-time Face Detection**: Uses dlib (with OpenCV fallback) for robust face detection, but as of now only OpenCV is working properly
 - **Facial Expression Analysis**: Detects emotions like happy, sad, angry, and surprised
 - **Dynamic Emoji Overlay**: Smoothly overlays emojis that match your facial expressions
 - **Cross-platform**: Works on Windows, macOS, and Linux
@@ -62,7 +62,7 @@ python src/run_webcam.py
 - `c` - Capture the current frame
 - `e` - Toggle between different emoji sets
 
-## 🏗️ Project Structure
+## Project Structure
 
 ```
 emoji-face-swap/
@@ -80,7 +80,7 @@ emoji-face-swap/
 └── setup.py                # Package configuration
 ```
 
-## 🤝 Contributing
+##  Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
@@ -90,11 +90,11 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📝 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 - [dlib](http://dlib.net/) - For facial landmark detection
 - [OpenCV](https://opencv.org/) - For computer vision utilities
