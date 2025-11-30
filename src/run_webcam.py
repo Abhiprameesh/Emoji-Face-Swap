@@ -10,18 +10,12 @@ def main():
     
     # Initialize paths
     BASE_DIR = Path(__file__).parent.parent
-    PREDICTOR_PATH = BASE_DIR / "data" / "shape_predictor_68_face_landmarks.dat"
     EMOJI_DIR = BASE_DIR / "emojis"
     
     print(f"Base directory: {BASE_DIR}")
-    print(f"Predictor path: {PREDICTOR_PATH}")
     print(f"Emoji directory: {EMOJI_DIR}")
     
     # Check if files exist
-    if not PREDICTOR_PATH.exists():
-        print(f"Error: Predictor file not found at {PREDICTOR_PATH}")
-        return
-        
     if not EMOJI_DIR.exists():
         print(f"Error: Emoji directory not found at {EMOJI_DIR}")
         return
@@ -29,7 +23,7 @@ def main():
     try:
         # Initialize components
         print("Initializing FaceDetector...")
-        face_detector = FaceDetector(str(PREDICTOR_PATH))
+        face_detector = FaceDetector()
         
         print("Initializing EmojiProcessor...")
         emoji_processor = EmojiProcessor(str(EMOJI_DIR))
@@ -45,6 +39,10 @@ def main():
         # For FPS calculation
         prev_frame_time = 0
         new_frame_time = 0
+        
+        # Track the last known good face position for smoothing
+        last_face = None
+        smoothing_factor = 0.5  # How much to smooth the face position (0-1)
         
         while True:
             # Read frame from webcam
@@ -63,7 +61,32 @@ def main():
                 # Detect faces
                 faces = face_detector.detect_faces(frame)
                 
-                for (rect, shape) in faces:
+                if faces:
+                    # For now, just take the first face
+                    rect, shape = faces[0]
+                    
+                    # Smooth face position if we had a previous detection
+                    if last_face is not None:
+                        lx, ly, lw, lh = last_face
+                        x, y, w, h = rect.left(), rect.top(), rect.width(), rect.height()
+                        
+                        # Apply smoothing
+                        x = int(lx * (1 - smoothing_factor) + x * smoothing_factor)
+                        y = int(ly * (1 - smoothing_factor) + y * smoothing_factor)
+                        w = int(lw * (1 - smoothing_factor) + w * smoothing_factor)
+                        h = int(lh * (1 - smoothing_factor) + h * smoothing_factor)
+                        
+                        # Update the rectangle
+                        rect = type('obj', (object,), {
+                            'left': lambda s, x=x: x,
+                            'top': lambda s, y=y: y,
+                            'width': lambda s, w=w: w,
+                            'height': lambda s, h=h: h
+                        })()
+                    
+                    # Store current face for next frame
+                    last_face = (rect.left(), rect.top(), rect.width(), rect.height())
+                    
                     try:
                         # Get face features
                         features = FaceDetector.get_face_features(shape)
@@ -75,23 +98,30 @@ def main():
                             # Get face rectangle coordinates
                             x, y, w, h = rect.left(), rect.top(), rect.width(), rect.height()
                             
-                            # Overlay emoji on the face
-                            display_frame = emoji_processor.overlay_emoji(
-                                display_frame, 
-                                emoji_name, 
-                                (x, y, w, h)
-                            )
+                            # Draw face rectangle (for debugging)
+                            cv2.rectangle(display_frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
                             
-                            # Display the predicted emotion
-                            cv2.putText(display_frame, f"Emotion: {emoji_name}", 
-                                      (x, y - 10), 
-                                      cv2.FONT_HERSHEY_SIMPLEX, 
-                                      0.7, (0, 255, 0), 2)
-                    
+                            try:
+                                # Overlay emoji on the face
+                                display_frame = emoji_processor.overlay_emoji(
+                                    display_frame, 
+                                    emoji_name, 
+                                    (x, y, w, h)
+                                )
+                                
+                                # Display the predicted emotion
+                                cv2.putText(display_frame, f"Emotion: {emoji_name}", 
+                                          (x, y - 15), 
+                                          cv2.FONT_HERSHEY_SIMPLEX, 
+                                          0.6, (0, 255, 0), 2)
+                            except Exception as e:
+                                print(f"Error overlaying emoji: {e}")
                     except Exception as e:
-                        print(f"Error processing face: {e}")
-                        continue
-                
+                        print(f"Error processing face features: {e}")
+                else:
+                    # No faces detected, clear the last known face
+                    last_face = None
+                    
                 # Calculate FPS
                 new_frame_time = time.time()
                 fps = 1 / (new_frame_time - prev_frame_time)

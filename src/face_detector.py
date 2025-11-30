@@ -1,131 +1,57 @@
 import cv2
 import numpy as np
-from pathlib import Path
-from imutils import face_utils
-import os
+import mediapipe as mp
 
 class FaceDetector:
-    def __init__(self, predictor_path):
-        print(f"Initializing FaceDetector with predictor: {predictor_path}")
-        self.use_dlib = False
-        self.detector = None
-        self.predictor = None
-        
-        # Try to import dlib
-        try:
-            import dlib
-            self.detector = dlib.get_frontal_face_detector()
-            self.predictor = dlib.shape_predictor(str(predictor_path))
-            self.use_dlib = True
-            print("Successfully initialized dlib face detector")
-        except ImportError:
-            print("Dlib not found, falling back to OpenCV face detection")
-            # Initialize OpenCV's face detector with full paths
-            face_cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-            eye_cascade_path = cv2.data.haarcascades + 'haarcascade_eye.xml'
-            
-            print(f"Loading face cascade from: {face_cascade_path}")
-            print(f"Loading eye cascade from: {eye_cascade_path}")
-            
-            if not os.path.exists(face_cascade_path):
-                print(f"Error: Face cascade file not found at {face_cascade_path}")
-                # Try to find the file in other possible locations
-                import glob
-                possible_paths = glob.glob('**/haarcascade_*.xml', recursive=True)
-                if possible_paths:
-                    print(f"Found possible cascade files: {possible_paths}")
-                    face_cascade_path = possible_paths[0]  # Use the first found cascade file
-                    print(f"Using cascade file: {face_cascade_path}")
-                else:
-                    print("No cascade files found in the project directory")
-            
-            self.face_cascade = cv2.CascadeClassifier(face_cascade_path)
-            self.eye_cascade = cv2.CascadeClassifier(eye_cascade_path) if os.path.exists(eye_cascade_path) else None
-            print("Using OpenCV face detection")
-        except Exception as e:
-            print(f"Error initializing dlib: {e}, falling back to OpenCV")
-            face_cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-            eye_cascade_path = cv2.data.haarcascades + 'haarcascade_eye.xml'
-            
-            print(f"Loading face cascade from: {face_cascade_path}")
-            print(f"Loading eye cascade from: {eye_cascade_path}")
-            
-            if not os.path.exists(face_cascade_path):
-                print(f"Error: Face cascade file not found at {face_cascade_path}")
-                # Try to find the file in other possible locations
-                import glob
-                possible_paths = glob.glob('**/haarcascade_*.xml', recursive=True)
-                if possible_paths:
-                    print(f"Found possible cascade files: {possible_paths}")
-                    face_cascade_path = possible_paths[0]  # Use the first found cascade file
-                    print(f"Using cascade file: {face_cascade_path}")
-                else:
-                    print("No cascade files found in the project directory")
-            
-            self.face_cascade = cv2.CascadeClassifier(face_cascade_path)
-            self.eye_cascade = cv2.CascadeClassifier(eye_cascade_path) if os.path.exists(eye_cascade_path) else None
-            self.eye_cascade = cv2.CascadeClassifier(
-                cv2.data.haarcascades + 'haarcascade_eye.xml'
-            )
-            print("Using OpenCV face detection")
+    def __init__(self, predictor_path=None):
+        # predictor_path is kept for compatibility but not used
+        print("Initializing MediaPipe Face Mesh...")
+        self.mp_face_mesh = mp.solutions.face_mesh
+        self.face_mesh = self.mp_face_mesh.FaceMesh(
+            max_num_faces=1,
+            refine_landmarks=True,
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5
+        )
+        print("MediaPipe Face Mesh initialized")
     
     def detect_faces(self, frame):
         try:
             if frame is None:
-                print("Error: Empty frame received")
                 return []
                 
-            if len(frame.shape) == 3:
-                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            else:
-                gray = frame
+            # Convert the BGR image to RGB
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            
+            # Process the image and find faces
+            results = self.face_mesh.process(rgb_frame)
+            
+            faces = []
+            
+            if results.multi_face_landmarks:
+                h, w, _ = frame.shape
                 
-            if self.use_dlib and self.detector is not None:
-                # Use dlib for detection
-                rects = self.detector(gray, 0)
-                faces = []
-                for rect in rects:
-                    try:
-                        shape = self.predictor(gray, rect)
-                        shape = face_utils.shape_to_np(shape)
-                        faces.append((rect, shape))
-                    except Exception as e:
-                        print(f"Error processing face with dlib: {e}")
-                return faces
-            else:
-                # Fallback to OpenCV
-                faces = []
-                rects = self.face_cascade.detectMultiScale(
-                    gray, 
-                    scaleFactor=1.1,
-                    minNeighbors=5,
-                    minSize=(30, 30)
-                )
-                
-                # Convert OpenCV rects to dlib-like format
-                for (x, y, w, h) in rects:
-                    # Create a dlib.rectangle like object
+                for face_landmarks in results.multi_face_landmarks:
+                    # Convert landmarks to numpy array
+                    landmarks = np.array([(lm.x * w, lm.y * h) for lm in face_landmarks.landmark])
+                    
+                    # Calculate bounding box
+                    x_min = int(np.min(landmarks[:, 0]))
+                    y_min = int(np.min(landmarks[:, 1]))
+                    x_max = int(np.max(landmarks[:, 0]))
+                    y_max = int(np.max(landmarks[:, 1]))
+                    
+                    # Create a rect-like object for compatibility
                     rect = type('obj', (object,), {
-                        'left': lambda s, x=x: x,
-                        'top': lambda s, y=y: y,
-                        'right': lambda s, x=x, w=w: x + w,
-                        'bottom': lambda s, y=y, h=h: y + h,
-                        'width': lambda s, w=w: w,
-                        'height': lambda s, h=h: h
+                        'left': lambda s, x=x_min: x,
+                        'top': lambda s, y=y_min: y,
+                        'width': lambda s, w=x_max-x_min: w,
+                        'height': lambda s, h=y_max-y_min: h
                     })()
                     
-                    # Create a simple face landmarks approximation
-                    landmarks = np.zeros((68, 2), dtype=int)
-                    # Just set some basic points as we don't have the predictor
-                    landmarks[36] = [x + w//4, y + h//3]        # Left eye
-                    landmarks[45] = [x + 3*w//4, y + h//3]      # Right eye
-                    landmarks[30] = [x + w//2, y + h//2]        # Nose
-                    landmarks[48] = [x + w//3, y + 2*h//3]      # Mouth left
-                    landmarks[54] = [x + 2*w//3, y + 2*h//3]    # Mouth right
-                    
                     faces.append((rect, landmarks))
-                
-                return faces
+            
+            return faces
                 
         except Exception as e:
             print(f"Error in detect_faces: {str(e)}")
@@ -134,86 +60,95 @@ class FaceDetector:
             return []
 
     @staticmethod
-    def eye_aspect_ratio(eye):
-        A = np.linalg.norm(eye[1] - eye[5])
-        B = np.linalg.norm(eye[2] - eye[4])
-        C = np.linalg.norm(eye[0] - eye[3])
-        ear = (A + B) / (2.0 * C) if C != 0 else 0.0
-        return ear
-    
-    @staticmethod
-    def mouth_aspect_ratio(mouth):
-        A = np.linalg.norm(mouth[13] - mouth[19])
-        B = np.linalg.norm(mouth[14] - mouth[18])
-        C = np.linalg.norm(mouth[15] - mouth[17])
-        D = np.linalg.norm(mouth[12] - mouth[16])
-        mar = (A + B + C) / (2 * D) if D != 0 else 0.0
-        return mar
-    
-    @classmethod
-    def get_face_features(cls, shape):
+    def get_face_features(landmarks):
         try:
-            # Eye aspect ratios (eye openness)
-            left_eye = shape[42:48]
-            right_eye = shape[36:42]
-            left_ear = cls.eye_aspect_ratio(left_eye)
-            right_ear = cls.eye_aspect_ratio(right_eye)
+            # MediaPipe Face Mesh Indices
+            # Left Eye
+            LEFT_EYE = [33, 160, 158, 133, 153, 144]
+            # Right Eye
+            RIGHT_EYE = [362, 385, 387, 263, 373, 380]
+            # Lips (Outer)
+            LIPS = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185]
+            # Eyebrows
+            LEFT_EYEBROW = [70, 63, 105, 66, 107]
+            RIGHT_EYEBROW = [336, 296, 334, 293, 300]
+            
+            # Helper function for EAR
+            def eye_aspect_ratio(eye_points):
+                # Vertical distances
+                A = np.linalg.norm(landmarks[eye_points[1]] - landmarks[eye_points[5]])
+                B = np.linalg.norm(landmarks[eye_points[2]] - landmarks[eye_points[4]])
+                # Horizontal distance
+                C = np.linalg.norm(landmarks[eye_points[0]] - landmarks[eye_points[3]])
+                return (A + B) / (2.0 * C) if C != 0 else 0
+
+            # Helper function for MAR
+            def mouth_aspect_ratio(mouth_points):
+                # Vertical
+                A = np.linalg.norm(landmarks[37] - landmarks[84]) # Inner lip top/bottom approx
+                # Horizontal
+                B = np.linalg.norm(landmarks[61] - landmarks[291]) # Corners
+                return A / B if B != 0 else 0
+
+            left_ear = eye_aspect_ratio(LEFT_EYE)
+            right_ear = eye_aspect_ratio(RIGHT_EYE)
             avg_ear = (left_ear + right_ear) / 2.0
             
-            # Mouth aspect ratio (smile/frown)
-            mouth = shape[48:68]
-            mar = cls.mouth_aspect_ratio(mouth)
+            # Mouth features
+            # Height: Top lip (0) to bottom lip (17)
+            mouth_height_val = np.linalg.norm(landmarks[0] - landmarks[17])
+            # Width: Left corner (61) to right corner (291)
+            mouth_width_val = np.linalg.norm(landmarks[61] - landmarks[291])
             
-            # Mouth height and width ratios
-            mouth_height = np.linalg.norm(shape[62] - shape[66])
-            mouth_width = np.linalg.norm(shape[54] - shape[48])
-            mouth_ratio = mouth_height / mouth_width if mouth_width > 0 else 0.1
+            # Face size reference (Top of head 10 to Chin 152)
+            face_height = np.linalg.norm(landmarks[10] - landmarks[152])
+            face_width = np.linalg.norm(landmarks[234] - landmarks[454]) # Ear to ear approx
+            face_size = (face_height + face_width) / 2.0
             
-            # Eyebrow raise (for surprise/anger)
-            left_eyebrow = np.mean(shape[17:22], axis=0)
-            right_eyebrow = np.mean(shape[22:27], axis=0)
+            # Normalized mouth features
+            mouth_height = mouth_height_val / face_size
+            mouth_width = mouth_width_val / face_size
+            mar = mouth_height / mouth_width if mouth_width > 0 else 0
+            mouth_ratio = mar # Using MAR as ratio
             
-            # Calculate eyebrow raise relative to eye position
-            left_eye_center = np.mean(shape[36:42], axis=0)
-            right_eye_center = np.mean(shape[42:48], axis=0)
+            # Eyebrow Raise
+            # Measure distance from eye center to eyebrow
+            # Left
+            l_eye_center = np.mean(landmarks[LEFT_EYE], axis=0)
+            l_brow_center = np.mean(landmarks[LEFT_EYEBROW], axis=0)
+            l_raise = (l_eye_center[1] - l_brow_center[1]) / face_size
             
-            # Eyebrow raise (negative values mean raised eyebrows)
-            left_eyebrow_raise = left_eye_center[1] - left_eyebrow[1]
-            right_eyebrow_raise = right_eye_center[1] - right_eyebrow[1]
-            eyebrow_raise = (left_eyebrow_raise + right_eyebrow_raise) / 2.0
+            # Right
+            r_eye_center = np.mean(landmarks[RIGHT_EYE], axis=0)
+            r_brow_center = np.mean(landmarks[RIGHT_EYEBROW], axis=0)
+            r_raise = (r_eye_center[1] - r_brow_center[1]) / face_size
             
-            # Nose position (relative to eyes)
-            nose_tip = shape[33]  # Using nose tip instead of point 30 for better stability
-            eyes_center = (left_eye_center + right_eye_center) / 2
-            nose_offset = nose_tip[1] - eyes_center[1]
+            eyebrow_raise = (l_raise + r_raise) / 2.0
             
-            # Jaw drop (for surprise) - using chin to nose tip distance
-            jaw_drop = shape[8][1] - nose_tip[1]
+            # Nose offset (not strictly needed for basic emotions but kept for compatibility)
+            nose_tip = landmarks[1]
+            eyes_center = (l_eye_center + r_eye_center) / 2
+            nose_offset = (nose_tip[1] - eyes_center[1]) / face_size
             
-            # Normalize features based on face size
-            face_width = np.linalg.norm(shape[16] - shape[0])  # Distance between face edges
-            if face_width > 0:
-                mouth_ratio /= face_width
-                jaw_drop /= face_width
-                eyebrow_raise /= face_width
+            # Jaw drop (Chin 152 to Nose 1)
+            jaw_drop = np.linalg.norm(landmarks[152] - landmarks[1]) / face_size
             
-            # Create feature vector with meaningful values
-            features = [
-                left_ear,                   # Left eye aspect ratio
-                right_ear,                  # Right eye aspect ratio
-                avg_ear,                    # Average eye aspect ratio
-                mar,                        # Mouth aspect ratio
-                mouth_height,               # Absolute mouth height
-                mouth_ratio,                # Mouth height/width ratio
-                eyebrow_raise,              # Eyebrow raise (negative = raised)
-                nose_offset,                # Nose position relative to eyes
-                jaw_drop,                   # Jaw drop (chin to nose tip)
-                mouth_width                 # Mouth width
-            ]
+            # Create feature vector
+            features = np.array([
+                left_ear,                   # 0
+                right_ear,                  # 1
+                avg_ear,                    # 2
+                mar,                        # 3
+                mouth_height,               # 4
+                mouth_ratio,                # 5
+                eyebrow_raise,              # 6
+                nose_offset,                # 7
+                jaw_drop,                   # 8
+                mouth_width                 # 9
+            ], dtype=np.float32)
             
-            return np.array(features, dtype=np.float32)
+            return features
             
         except Exception as e:
             print(f"Error in get_face_features: {e}")
-            # Return default values in case of error
             return np.zeros(10, dtype=np.float32)

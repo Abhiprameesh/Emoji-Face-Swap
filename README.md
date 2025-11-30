@@ -1,14 +1,14 @@
 # Emoji Face Swap
 
-A real-time computer vision application that detects faces using your webcam and overlays expressive emojis based on facial expressions. The application uses a combination of OpenCV and dlib (with a fallback to OpenCV's Haar cascades) for face detection and emotion recognition.
+A real-time computer vision application that detects faces using your webcam and overlays expressive emojis based on facial expressions. The application uses a combination of OpenCV, dlib, and MediaPipe for face detection and facial landmark detection.
 
-##  Features
+## 🎯 Features
 
-- **Real-time Face Detection**: Uses dlib (with OpenCV fallback) for robust face detection, but as of now only OpenCV is working properly
-- **Facial Expression Analysis**: Detects emotions like happy, sad, angry, and surprised
+- **Real-time Face Detection**: Utilizes dlib and OpenCV for robust face detection
+- **Facial Landmark Detection**: Accurately identifies 68 facial landmarks using dlib's pre-trained model
 - **Dynamic Emoji Overlay**: Smoothly overlays emojis that match your facial expressions
 - **Cross-platform**: Works on Windows, macOS, and Linux
-- **Responsive UI**: Shows FPS counter and current emotion detection
+- **Performance Optimized**: Features FPS counter and efficient processing
 - **Multiple Emoji Sets**: Supports various emoji styles and expressions
 
 ## 🚀 Getting Started
@@ -17,10 +17,12 @@ A real-time computer vision application that detects faces using your webcam and
 
 - Python 3.7+
 - OpenCV (cv2)
-- dlib (optional, falls back to OpenCV if not available)
+- dlib
 - NumPy
 - imutils
 - scikit-learn
+- MediaPipe
+- Pillow
 
 ### Installation
 
@@ -40,6 +42,8 @@ A real-time computer vision application that detects faces using your webcam and
    python3 -m venv .venv
    source .venv/bin/activate
    ```
+   
+   Note: If you encounter issues with dlib installation on Windows, you may need to install CMake and Visual Studio Build Tools first.
 
 3. **Install dependencies**:
    ```bash
@@ -47,8 +51,9 @@ A real-time computer vision application that detects faces using your webcam and
    ```
 
 4. **Download the facial landmark predictor**:
-   - Download `shape_predictor_68_face_landmarks.dat` from [dlib.net/files/](http://dlib.net/files/)
-   - Place it in the `data/` directory
+   - Download `shape_predictor_68_face_landmarks.dat.bz2` from [dlib.net/files/](http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2)
+   - Extract the .dat file and place it in the `data/` directory
+   - The file should be at `data/shape_predictor_68_face_landmarks.dat`
 
 ## 🖥️ Usage
 
@@ -61,24 +66,28 @@ python src/run_webcam.py
 - `q` - Quit the application
 - `c` - Capture the current frame
 - `e` - Toggle between different emoji sets
+- `d` - Toggle debug mode (shows facial landmarks)
+- `f` - Toggle fullscreen mode
 
 ## Project Structure
 
 ```
 emoji-face-swap/
 ├── data/                    # Data files (shape predictor model)
+│   └── shape_predictor_68_face_landmarks.dat  # dlib's facial landmark predictor
 ├── emojis/                  # Emoji images for different expressions
+│   ├── default/             # Default emoji set
+│   └── custom/              # Custom emoji sets can be added here
 ├── models/                  # Trained models (not in version control)
 ├── src/                     # Source code
-│   ├── emoji_utils.py       # Emoji loading and overlay logic
-│   ├── face_detector.py     # Face detection and feature extraction
-│   ├── run_webcam.py        # Main application script
-│   └── train.py             # Model training script
+│   ├── emoji_utils.py       # Emoji loading, processing, and overlay logic
+│   ├── face_detector.py     # Face detection and landmark detection
+│   ├── run_webcam.py        # Main application script with webcam interface
+│   └── train.py             # Script for training custom models (if needed)
 ├── .gitignore               # Git ignore file
 ├── README.md                # This file
 ├── requirements.txt         # Python dependencies
 └── setup.py                # Package configuration
-```
 
 ##  Contributing
 
